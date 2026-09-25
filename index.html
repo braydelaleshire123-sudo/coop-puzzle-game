@@ -3,7 +3,36 @@
 <canvas id="c"></canvas><div class="hud"><div class="top"><span><span class="p1">P1</span> WASD <span class="hp" id="h1"></span></span><span id="lv">ROOM 1 / 8</span><span><span class="p2">P2</span> ARROWS <span class="hp" id="h2"></span></span></div><div class="msg" id="msg"></div></div>
 <div class="menu" id="menu"><div class="panel"><h1 id="title">SYNCBOUND</h1><p id="desc">An experimental facility built for two. Push crates, survive hazards, activate both locks, and escape together.</p><p><b class="p1">P1:</b> WASD &nbsp; <b class="p2">P2:</b> Arrow Keys</p><p>Push <b>crates</b> by walking into them. Red hazards damage you. Reach the glowing exit together.</p><button id="start">START CO-OP</button><p class="small">R restart room • ESC pause</p></div></div>
 <script>
-const c=document.getElementById('c'),g=c.getContext('2d');let W,H,keys={},running=false,paused=false,room=0,cam={x:0,y:0},toastTimer=0;
+const c=document.getElementById('c'),g=c.getContext('2d');
+// Original procedural soundtrack: no external audio files needed.
+let audioCtx=null, master=null, musicTimer=null, musicStep=0;
+const chords=[[65.41,77.78,98],[58.27,69.30,87.31],[73.42,87.31,110],[55,65.41,82.41]];
+function startMusic(){
+  if(audioCtx){if(audioCtx.state==='suspended')audioCtx.resume();return}
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  master=audioCtx.createGain();master.gain.value=.055;master.connect(audioCtx.destination);
+  musicStep=0;
+  musicTimer=setInterval(playMusicStep,500);
+  playMusicStep();
+}
+function tone(freq,dur=.42,type='sine',gain=.025){
+  if(!audioCtx)return;
+  const o=audioCtx.createOscillator(), a=audioCtx.createGain();
+  o.type=type;o.frequency.value=freq;a.gain.setValueAtTime(.0001,audioCtx.currentTime);
+  a.gain.exponentialRampToValueAtTime(gain,audioCtx.currentTime+.025);
+  a.gain.exponentialRampToValueAtTime(.0001,audioCtx.currentTime+dur);
+  o.connect(a);a.connect(master);o.start();o.stop(audioCtx.currentTime+dur+.03);
+}
+function playMusicStep(){
+  if(!running||paused)return;
+  const chord=chords[Math.floor(musicStep/4)%chords.length], beat=musicStep%4;
+  tone(chord[beat%3],.46,'triangle',.018);
+  if(beat===0)tone(chord[0]/2,.8,'sine',.022);
+  if(beat===2)tone(chord[1]*2,.22,'sine',.012);
+  musicStep++;
+}
+function sfx(freq,type='square',gain=.035,dur=.09){tone(freq,dur,type,gain)}
+let W,H,keys={},running=false,paused=false,room=0,cam={x:0,y:0},toastTimer=0;
 const rooms=[
 {w:1900,h:950,s:[[120,800],[230,800]],e:[1740,120],pads:[[520,760],[520,170]],walls:[[0,850,1900,100],[0,0,55,950],[1845,0,55,950],[760,350,55,500],[1200,0,55,500],[1500,350,55,500]],cr:[[370,760]],haz:[],drones:[]},
 {w:2100,h:1050,s:[[120,900],[250,900]],e:[1920,110],pads:[[520,820],[1580,250]],walls:[[0,950,2100,100],[0,0,55,1050],[2045,0,55,1050],[680,550,55,400],[1020,0,55,700],[1400,550,55,400]],cr:[[480,820],[850,820]],haz:[[1120,820,220,45]],drones:[]},
@@ -32,5 +61,5 @@ let pad=l.pads.map(q=>crates.some(b=>Math.hypot(b.x-q[0],b.y-q[1])<48)||P.some(p
 let ex=P.every(p=>Math.hypot(p.x-l.e[0],p.y-l.e[1])<95);if(ex&&both){room++;if(room<rooms.length)reset();else{running=false;document.getElementById('menu').style.display='grid';document.getElementById('title').textContent='FACILITY ESCAPED';document.getElementById('desc').textContent='You cleared all 8 rooms. Two players, one escape.';document.getElementById('start').textContent='PLAY AGAIN';room=0}}
 cam.x+=(Math.max(P[0].x,P[1].x)-W/2-cam.x)*.08;cam.y+=(Math.max(P[0].y,P[1].y)-H/2-cam.y)*.08;cam.x=Math.max(0,Math.min(l.w-W,cam.x));cam.y=Math.max(0,Math.min(l.h-H,cam.y));document.getElementById('h1').textContent='HP '+P[0].hp;document.getElementById('h2').textContent='HP '+P[1].hp}
 function draw(){W=c.width=innerWidth;H=c.height=innerHeight;g.clearRect(0,0,W,H);let l=roomData();g.save();g.translate(-cam.x,-cam.y);g.fillStyle='#0b111c';g.fillRect(0,0,l.w,l.h);for(let i=0;i<l.w;i+=80){g.strokeStyle='#ffffff07';g.beginPath();g.moveTo(i,0);g.lineTo(i,l.h);g.stroke()}for(let j=0;j<l.h;j+=80){g.strokeStyle='#ffffff07';g.beginPath();g.moveTo(0,j);g.lineTo(l.w,j);g.stroke()}l.walls.forEach(r=>{g.fillStyle='#27344a';g.fillRect(...r);g.strokeStyle='#627a9e';g.strokeRect(...r)});l.haz.forEach(r=>{g.fillStyle='#d34b4b';g.fillRect(...r);for(let z=r[0];z<r[0]+r[2];z+=20){g.fillStyle='#ffb34d';g.fillRect(z,r[1],10,r[3])}});l.pads.forEach((q,i)=>{let active=crates.some(b=>Math.hypot(b.x-q[0],b.y-q[1])<48)||P.some(p=>Math.hypot(p.x-q[0],p.y-q[1])<45);g.beginPath();g.arc(q[0],q[1],45,0,7);g.fillStyle=active?'#54e49a':'#25384e';g.fill();g.strokeStyle=i?'#ff986c':'#58b9ff';g.lineWidth=5;g.stroke()});crates.forEach(b=>{g.fillStyle='#b28a55';g.fillRect(b.x-27,b.y-27,54,54);g.strokeStyle='#f2c77d';g.strokeRect(b.x-27,b.y-27,54,54);g.fillStyle='#6e5130';g.fillRect(b.x-7,b.y-7,14,14)});drones.forEach(d=>{g.fillStyle='#f05b65';g.beginPath();g.arc(d.x,d.y,d.r,0,7);g.fill();g.fillStyle='#fff';g.fillRect(d.x-6,d.y-3,4,5);g.fillRect(d.x+2,d.y-3,4,5)});g.beginPath();g.arc(l.e[0],l.e[1],72,0,7);g.fillStyle=l.pads.every(q=>crates.some(b=>Math.hypot(b.x-q[0],b.y-q[1])<48)||P.some(p=>Math.hypot(p.x-q[0],p.y-q[1])<45))?'#55e6a0':'#172333';g.fill();g.strokeStyle='#dceaff';g.lineWidth=4;g.stroke();g.fillStyle='#fff';g.font='bold 16px system-ui';g.textAlign='center';g.fillText('EXIT',l.e[0],l.e[1]+6);P.forEach((p,i)=>{if(p.hp<=0)return;g.shadowBlur=18;g.shadowColor=p.c;g.fillStyle=p.c;g.beginPath();g.arc(p.x,p.y,p.r,0,7);g.fill();g.shadowBlur=0;g.fillStyle='#07101b';g.font='bold 12px system-ui';g.fillText(i?'2':'1',p.x,p.y+4)});g.restore();if(paused){g.fillStyle='#000a';g.fillRect(0,0,W,H);g.fillStyle='#fff';g.font='bold 42px system-ui';g.textAlign='center';g.fillText('PAUSED',W/2,H/2)}requestAnimationFrame(loop)}
-function loop(){update();draw()}addEventListener('keydown',e=>{keys[e.key]=true;if(e.key.toLowerCase()==='r'&&running)reset();if(e.key==='Escape'&&running)paused=!paused});addEventListener('keyup',e=>keys[e.key]=false);document.getElementById('start').onclick=()=>{document.getElementById('menu').style.display='none';running=true;paused=false;reset()};addEventListener('resize',draw);reset();loop();
+function loop(){update();draw()}addEventListener('keydown',e=>{keys[e.key]=true;if(e.key.toLowerCase()==='r'&&running){reset();sfx(180,'square',.035,.12)}if(e.key==='Escape'&&running){paused=!paused;sfx(paused?130:260,'triangle',.03,.12)}});addEventListener('keyup',e=>keys[e.key]=false);document.getElementById('start').onclick=()=>{startMusic();document.getElementById('menu').style.display='none';running=true;paused=false;reset();sfx(220,'triangle',.05,.25)};addEventListener('resize',draw);reset();loop();
 </script></body></html>

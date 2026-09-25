@@ -1,86 +1,50 @@
-<!doctype html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SYNCBOUND 3D</title>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Doodle Jump</title>
 <style>
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#05070b;color:#fff;font-family:system-ui}
-#game{width:100%;height:100%;display:block}
-#hud{position:fixed;inset:0;pointer-events:none;text-shadow:0 2px 6px #000}
-#top{display:flex;justify-content:space-between;padding:14px 18px;font-weight:800;font-size:15px}
-.blue{color:#55bfff}.orange{color:#ff9b6d}
-#hint{position:absolute;top:58px;left:50%;transform:translateX(-50%);padding:9px 14px;border-radius:10px;background:#101827dd;border:1px solid #ffffff22;opacity:0;transition:.2s}
-#menu{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at center,#263b62,#05070b 72%);z-index:5;text-align:center}
-.panel{width:min(720px,90vw);padding:36px;border:1px solid #ffffff22;border-radius:24px;background:#09101cee;box-shadow:0 25px 80px #000}
-h1{font-size:clamp(42px,8vw,78px);letter-spacing:6px;margin:0 0 8px}
-p{color:#b8c5d8;line-height:1.5}.panel button{font:inherit;font-weight:800;padding:14px 24px;border:0;border-radius:12px;cursor:pointer}
-#pause{display:none;position:fixed;inset:0;z-index:4;background:#0009;place-items:center;font-size:46px;font-weight:900}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#dff6ff;font-family:system-ui}canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;top:12px;left:0;right:0;display:flex;justify-content:space-between;padding:0 18px;font-weight:900;font-size:20px;color:#17324d;text-shadow:0 2px #fff;pointer-events:none}
+#menu{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(#bdeeffcc,#fff8);text-align:center}
+.panel{background:#fff;padding:30px;border:4px solid #17324d;border-radius:22px;box-shadow:0 10px 0 #17324d;width:min(520px,90vw)}
+h1{font-size:clamp(48px,10vw,82px);margin:0;color:#55a85b;letter-spacing:2px}p{color:#40566b}.panel button{font:inherit;font-weight:900;font-size:20px;padding:14px 28px;border:3px solid #17324d;border-radius:14px;background:#ffd34d;cursor:pointer}
+.small{font-size:13px}
 </style></head><body>
-<canvas id="game"></canvas>
-<div id="hud"><div id="top"><span><span class="blue">P1</span> WASD · HP <b id="hp1">5</b></span><span id="room">ROOM 1 / 8</span><span><span class="orange">P2</span> ARROWS · HP <b id="hp2">5</b></span></div><div id="hint"></div></div>
-<div id="pause">PAUSED</div>
-<div id="menu"><div class="panel"><h1 id="title">SYNCBOUND</h1><p id="desc">A fully 3D two-player co-op puzzle facility.</p><p><b class="blue">P1:</b> WASD &nbsp; <b class="orange">P2:</b> Arrow Keys</p><p>Push crates onto glowing pads. Avoid hazards and drones. Get both players to the exit.</p><button id="start">START 3D CO-OP</button><p>R = restart room · ESC = pause</p></div></div>
-<script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-
-const canvas=document.getElementById('game');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-const scene=new THREE.Scene();scene.background=new THREE.Color(0x05070b);scene.fog=new THREE.Fog(0x05070b,28,75);
-const camera=new THREE.PerspectiveCamera(62,innerWidth/innerHeight,.1,200);
-scene.add(new THREE.HemisphereLight(0x9bbdff,0x182030,2.2));
-const sun=new THREE.DirectionalLight(0xffffff,2.4);sun.position.set(15,28,10);sun.castShadow=true;scene.add(sun);
-
-const rooms=[
-{size:[70,46],spawn:[[-27,16],[-27,21]],exit:[29,-17],pads:[[-10,15],[11,-15]],walls:[[-5,0,2,34],[14,8,2,22]],crates:[[-19,15]],haz:[[[1,13],[9,3]]],drones:0},
-{size:[78,50],spawn:[[-31,18],[-31,23]],exit:[32,-19],pads:[[-15,15],[18,-14]],walls:[[-7,3,2,38],[5,-12,2,25],[19,6,2,30]],crates:[[-22,15],[-2,15]],haz:[[[8,16],[11,3]]],drones:0},
-{size:[84,54],spawn:[[-34,20],[-34,25]],exit:[35,-20],pads:[[-17,17],[20,17]],walls:[[-10,5,2,38],[2,-7,2,30],[14,5,2,38],[27,-8,2,24]],crates:[[-22,17],[-3,17],[9,17]],haz:[[[0,9],[10,3]]],drones:1},
-{size:[90,58],spawn:[[-37,22],[-37,27]],exit:[39,-22],pads:[[-20,19],[23,-14]],walls:[[-16,5,2,46],[-3,-9,2,32],[10,7,2,42],[24,-8,2,34]],crates:[[-25,19],[-8,19],[8,19]],haz:[[[10,15],[13,3]]],drones:2},
-{size:[98,62],spawn:[[-41,24],[-41,29]],exit:[43,-24],pads:[[-23,20],[26,-16]],walls:[[-18,5,2,50],[-4,-10,2,34],[10,8,2,44],[25,-10,2,36],[36,8,2,40]],crates:[[-29,20],[-12,20],[5,20],[20,20]],haz:[[[4,12],[14,3]]],drones:2},
-{size:[106,66],spawn:[[-45,26],[-45,31]],exit:[47,-26],pads:[[-26,22],[29,-17]],walls:[[-20,6,2,54],[-5,-11,2,36],[10,9,2,46],[25,-11,2,38],[40,9,2,46]],crates:[[-31,22],[-14,22],[3,22],[20,22]],haz:[[[7,14],[15,3]],[[28,2],[9,3]]],drones:3},
-{size:[114,70],spawn:[[-49,28],[-49,33]],exit:[51,-28],pads:[[-29,24],[32,-18]],walls:[[-22,6,2,58],[-7,-12,2,38],[8,10,2,48],[23,-12,2,40],[38,10,2,48]],crates:[[-34,24],[-17,24],[0,24],[17,24],[28,24]],haz:[[[5,16],[16,3]],[[31,3],[10,3]]],drones:3},
-{size:[122,74],spawn:[[-53,30],[-53,35]],exit:[55,-30],pads:[[-32,26],[35,-20]],walls:[[-24,7,2,62],[-8,-13,2,40],[8,11,2,50],[24,-13,2,42],[40,11,2,50],[50,-10,2,34]],crates:[[-37,26],[-20,26],[-3,26],[14,26],[30,26]],haz:[[[6,18],[18,3]],[[34,4],[11,3]],[[45,-8],[8,3]]],drones:4}
-];
-
-let room=0,players=[],crates=[],drones=[],objects=[],keys={},running=false,paused=false,toastT=0;
-const mat=(color,metal=0.05,rough=.65)=>new THREE.MeshStandardMaterial({color,metalness:metal,roughness:rough});
-const mats={floor:mat(0x111925),wall:mat(0x33445d,.25,.5),blue:mat(0x35aaff,.15,.35),orange:mat(0xff7d43,.15,.35),crate:mat(0x9b7040,.05,.7),haz:mat(0xd53d45,.1,.4),drone:mat(0xd84b57,.2,.3),exit:mat(0x64e8a3,.1,.25)};
-
-function clear(){while(scene.children.length>3)scene.remove(scene.children[3]);objects=[]}
-function box(x,y,z,sx,sy,sz,material,shadow=true){const m=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),material);m.position.set(x,sy/2,z);m.castShadow=shadow;m.receiveShadow=true;scene.add(m);objects.push(m);return m}
-function cyl(x,y,z,r,h,material){const m=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,24),material);m.position.set(x,y,z);m.castShadow=true;scene.add(m);objects.push(m);return m}
-function makePlayer(i){const q=rooms[room].spawn[i],group=new THREE.Group();const body=cyl(0,1,0,.72,1.8,i?mats.orange:mats.blue);const head=new THREE.Mesh(new THREE.SphereGeometry(.48,20,14),i?mats.orange:mats.blue);head.position.y=2.1;group.add(body,head);group.position.set(q[0],0,q[1]);scene.add(group);return{x:q[0],z:q[1],hp:5,mesh:group,r:.8,cool:0}}
-function makeRoom(){clear();const l=rooms[room], [w,d]=l.size;
-box(0,-.25,0,w,.5,d,mats.floor,false);
-box(0,0,-d/2,w,5,.5,mats.wall);box(0,0,d/2,w,5,.5,mats.wall);box(-w/2,0,0,.5,5,d,mats.wall);box(w/2,0,0,.5,5,d,mats.wall);
-l.walls.forEach(v=>box(v[0],0,v[1],v[2],5,v[3],mats.wall));
-l.pads.forEach((q,i)=>{const m=new THREE.Mesh(new THREE.CylinderGeometry(2.1,2.1,.18,32),i?mats.orange:mats.blue);m.position.set(q[0],.1,q[1]);scene.add(m);objects.push(m)});
-const em=new THREE.Mesh(new THREE.TorusGeometry(2.8,.22,12,40),mats.exit);em.position.set(l.exit[0],2,l.exit[1]);em.rotation.x=Math.PI/2;scene.add(em);objects.push(em);
-crates=l.crates.map(q=>{const m=box(q[0],0,q[1],2.3,2.3,2.3,mats.crate);return{x:q[0],z:q[1],mesh:m}});
-l.haz.forEach(v=>{const m=box(v[0][0],.12,v[0][1],v[1][0],.25,v[1][1],mats.haz,false);});
-players=[makePlayer(0),makePlayer(1)];
-drones=[];for(let i=0;i<l.drones;i++){const x=8+i*9,z=-5+(i%2)*10;const m=cyl(x,2,z,.7,.7,mats.drone);drones.push({x,z,mesh:m,t:i*20})}
-camera.position.set(0,35,32);camera.lookAt(0,0,0);document.getElementById('room').textContent='ROOM '+(room+1)+' / '+rooms.length;document.getElementById('hp1').textContent=5;document.getElementById('hp2').textContent=5;
-toast(room===0?'Push the crate onto the blue pad, then solve the room!':'New room — coordinate both players.');
+<canvas id="game"></canvas><div id="hud"><span>⭐ <b id="score">0</b></span><span>🏆 <b id="best">0</b></span></div>
+<div id="menu"><div class="panel"><h1>DOODLE JUMP</h1><p>Jump automatically, land on platforms, and climb as high as you can.</p><p><b>← →</b> or <b>A D</b> to move</p><button id="start">PLAY</button><p class="small">Land on platforms to keep bouncing. Don't fall!</p></div></div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');let W,H,player,plats=[],score=0,best=Number(localStorage.doodleBest||0),running=false,gameOver=false,keys={},cam=0;
+function resize(){W=c.width=innerWidth;H=c.height=innerHeight}addEventListener('resize',resize);resize();document.getElementById('best').textContent=best;
+function reset(){
+ score=0;cam=0;gameOver=false;
+ player={x:W/2,y:H-130,w:42,h:52,vx:0,vy:-11};
+ plats=[];
+ let y=H-55;
+ for(let i=0;i<14;i++){plats.push({x:Math.random()*(W-110),y,w:110,h:14});y-=55+Math.random()*35}
+ plats[0].x=W/2-55;
+ document.getElementById('score').textContent=0;
 }
-function toast(t){const h=document.getElementById('hint');h.textContent=t;h.style.opacity=1;clearTimeout(toastT);toastT=setTimeout(()=>h.style.opacity=0,2200)}
-function blocked(x,z,r=.8){const l=rooms[room], [w,d]=l.size;if(Math.abs(x)>w/2-r||Math.abs(z)>d/2-r)return true;return l.walls.some(v=>x+r>v[0]-v[2]/2&&x-r<v[0]+v[2]/2&&z+r>v[1]-v[3]/2&&z-r<v[1]+v[3]/2)}
-function push(p,dx,dz){for(const b of crates){const dist=Math.hypot(p.x-b.x,p.z-b.z);if(dist<2.2){const nx=dx/(Math.hypot(dx,dz)||1),nz=dz/(Math.hypot(dx,dz)||1),tx=b.x+nx*3,tz=b.z+nz*3;if(!blocked(tx,tz,1.15)&&!crates.some(o=>o!==b&&Math.hypot(o.x-tx,o.z-tz)<2.5)){b.x=tx;b.z=tz;b.mesh.position.x=tx;b.mesh.position.z=tz;}}}}
-function move(p,dx,dz){const ox=p.x,oz=p.z;p.x+=dx;if(blocked(p.x,p.z,p.r)){p.x=ox;push(p,dx,0)}p.z+=dz;if(blocked(p.x,p.z,p.r)){p.z=oz;push(p,0,dz)}p.mesh.position.x=p.x;p.mesh.position.z=p.z}
-function padOn(q){return crates.some(b=>Math.hypot(b.x-q[0],b.z-q[1])<2.8)||players.some(p=>Math.hypot(p.x-q[0],p.z-q[1])<2.1)}
-function reset(){makeRoom()}
-function damage(p){if(p.cool>0)return;p.hp--;p.cool=50;if(p.hp<=0){toast('Player down — restarting room');setTimeout(reset,700)}}
+function start(){document.getElementById('menu').style.display='none';running=true;reset()}
+function newPlatforms(){while(plats.length&&plats[0].y>cam+H+100)plats.shift();let top=Math.min(...plats.map(p=>p.y));while(top>cam-100){top-=55+Math.random()*45;let width=85+Math.random()*55;plats.push({x:Math.random()*(W-width),y:top,w:width,h:14})}}
 function update(){
- if(!running||paused)return;const binds=[['a','d','w','s'],['ArrowLeft','ArrowRight','ArrowUp','ArrowDown']];
- players.forEach((p,i)=>{p.cool=Math.max(0,p.cool-1);if(p.hp<=0)return;const k=binds[i],dx=(keys[k[1]]?1:0)-(keys[k[0]]?1:0),dz=(keys[k[3]]?1:0)-(keys[k[2]]?1:0),len=Math.hypot(dx,dz)||1;if(dx||dz)move(p,dx/len*.24,dz/len*.24)});
-const l=rooms[room];
-l.haz.forEach(v=>players.forEach(p=>{const x=v[0][0],z=v[0][1],sx=v[1][0]/2,sz=v[1][1]/2;if(Math.abs(p.x-x)<sx+.7&&Math.abs(p.z-z)<sz+.7){damage(p);toast('Hazard! HP '+p.hp)}}));
-drones.forEach(d=>{d.t++;const p=players.reduce((a,b)=>Math.hypot(a.x-d.x,a.z-d.z)<Math.hypot(b.x-d.x,b.z-d.z)?a:b;const dx=p.x-d.x,dz=p.z-d.z,len=Math.hypot(dx,dz)||1;d.x+=dx/len*.07;d.z+=dz/len*.07;d.mesh.position.x=d.x;d.mesh.position.z=d.z;if(len<2.2&&d.t%35===0){damage(p);toast('Drone hit! HP '+p.hp)}});
-const solved=l.pads.every(padOn);const nearExit=players.every(p=>Math.hypot(p.x-l.exit[0],p.z-l.exit[1])<4.5);
-if(solved&&nearExit){room++;if(room<rooms.length)makeRoom();else{running=false;document.getElementById('menu').style.display='grid';document.getElementById('title').textContent='FACILITY ESCAPED';document.getElementById('desc').textContent='You cleared all 8 three-dimensional rooms!';document.getElementById('start').textContent='PLAY AGAIN';room=0}}
-const mid=new THREE.Vector3((players[0].x+players[1].x)/2,0,(players[0].z+players[1].z)/2);const target=new THREE.Vector3(mid.x,0,mid.z);camera.position.x+=(target.x-camera.position.x)*.035;camera.position.z+=(target.z+32-camera.position.z)*.035;camera.lookAt(target);
-document.getElementById('hp1').textContent=players[0].hp;document.getElementById('hp2').textContent=players[1].hp;
+ if(!running||gameOver)return;
+ const left=keys.ArrowLeft||keys.a,right=keys.ArrowRight||keys.d;
+ player.vx+=(right?0.7:0)-(left?0.7:0);player.vx*=.88;player.vx=Math.max(-6,Math.min(6,player.vx));player.x+=player.vx;
+ if(player.x<-player.w)player.x=W;if(player.x>W)player.x=-player.w;
+ const oldBottom=player.y+player.h;player.vy+=.42;player.y+=player.vy;
+ if(player.vy>0)for(const p of plats)if(oldBottom<=p.y&&player.y+player.h>=p.y&&player.x+player.w>p.x&&player.x<p.x+p.w){player.y=p.y-player.h;player.vy=-11.5;score++;document.getElementById('score').textContent=score;if(score>best){best=score;localStorage.doodleBest=best;document.getElementById('best').textContent=best}}
+ const target=H*.38;if(player.y<target){let d=target-player.y;player.y=target;cam-=d;plats.forEach(p=>p.y+=d)}
+ newPlatforms();
+ if(player.y>H+80){gameOver=true;running=false;document.getElementById('menu').style.display='grid';document.querySelector('#menu h1').textContent='GAME OVER';document.querySelector('#menu p').textContent='Score: '+score+' · Best: '+best;document.getElementById('start').textContent='PLAY AGAIN'}
 }
-function resize(){renderer.setSize(innerWidth,innerHeight);camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix()}addEventListener('resize',resize);resize();
-addEventListener('keydown',e=>{keys[e.key]=true;if(e.key.toLowerCase()==='r'&&running)reset();if(e.key==='Escape'&&running){paused=!paused;document.getElementById('pause').style.display=paused?'grid':'none'}});addEventListener('keyup',e=>keys[e.key]=false);
-document.getElementById('start').onclick=()=>{document.getElementById('menu').style.display='none';running=true;paused=false;room=0;makeRoom()};
-function loop(){update();renderer.render(scene,camera);requestAnimationFrame(loop)}loop();
+function draw(){
+ x.clearRect(0,0,W,H);
+ let grd=x.createLinearGradient(0,0,0,H);grd.addColorStop(0,'#9fe4ff');grd.addColorStop(1,'#f8fdff');x.fillStyle=grd;x.fillRect(0,0,W,H);
+ // clouds
+ x.fillStyle='#ffffffaa';for(let i=0;i<7;i++){let cx=(i*190-(cam*.18))%(W+220)-80,cy=100+(i%4)*150;x.beginPath();x.arc(cx,cy,28,0,7);x.arc(cx+30,cy-12,36,0,7);x.arc(cx+65,cy,25,0,7);x.fill()}
+ plats.forEach(p=>{x.fillStyle='#55a85b';x.beginPath();x.roundRect(p.x,p.y,p.w,p.h,7);x.fill();x.fillStyle='#2e6f39';x.fillRect(p.x,p.y+p.h-4,p.w,4)});
+ // doodle character
+ x.save();x.translate(player.x,player.y);x.strokeStyle='#17324d';x.lineWidth=4;x.fillStyle='#ffd34d';x.beginPath();x.ellipse(player.w/2,player.h/2,player.w/2-3,player.h/2-3,0,0,7);x.fill();x.stroke();
+ x.fillStyle='#17324d';x.beginPath();x.arc(13,18,4,0,7);x.arc(29,18,4,0,7);x.fill();x.beginPath();x.arc(21,29,9,0,Math.PI);x.stroke();x.restore();
+}
+function loop(){update();draw();requestAnimationFrame(loop)}
+addEventListener('keydown',e=>{keys[e.key]=true;if(['ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault()});addEventListener('keyup',e=>keys[e.key]=false);
+document.getElementById('start').onclick=start;reset();loop();
 </script></body></html>

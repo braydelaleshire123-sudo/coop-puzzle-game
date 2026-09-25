@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SYNCBOUND — Co-op Puzzle</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#080b12;color:#eef3ff;font-family:system-ui,Arial,sans-serif;overflow:hidden}
+#game{display:block;width:100vw;height:100vh;background:#101622}
+#hud{position:fixed;inset:0;pointer-events:none}.top{display:flex;justify-content:space-between;padding:18px 22px;font-weight:700;text-shadow:0 2px 8px #000}
+#msg{position:absolute;top:68px;left:50%;transform:translateX(-50%);background:#111a2acc;border:1px solid #ffffff22;border-radius:12px;padding:10px 16px;opacity:0;transition:.2s}
+#menu{position:fixed;inset:0;background:radial-gradient(circle at 50% 40%,#263b62,#080b12 70%);display:grid;place-items:center;text-align:center}
+.panel{max-width:650px;padding:42px;border:1px solid #ffffff22;border-radius:24px;background:#0c1220e8;box-shadow:0 25px 80px #0009}
+h1{font-size:clamp(44px,8vw,82px);margin:0 0 6px;letter-spacing:5px}p{color:#b9c5da;line-height:1.5}
+button{pointer-events:auto;border:0;border-radius:12px;padding:14px 24px;background:#edf3ff;color:#0b1020;font-weight:800;font-size:17px;cursor:pointer}
+#controls{font-size:13px;color:#8e9bb3;margin-top:18px}.p1{color:#64b5ff}.p2{color:#ff9d70}
+</style></head>
+<body>
+<canvas id="game"></canvas>
+<div id="hud"><div class="top"><span><span class="p1">P1</span> WASD</span><span id="level">LEVEL 1 / 5</span><span><span class="p2">P2</span> ARROWS</span></div><div id="msg"></div></div>
+<div id="menu"><div class="panel"><h1>SYNCBOUND</h1><p>Two explorers. One impossible facility. Every door requires both of you.</p><p><b class="p1">Player 1:</b> WASD &nbsp; <b class="p2">Player 2:</b> Arrow Keys</p><p>Stand on both pressure pads, activate switches, and reach the exit together.</p><button id="start">START CO-OP</button><div id="controls">R = restart level &nbsp; • &nbsp; ESC = pause</div></div></div>
+<script>
+const c=document.getElementById('game'),x=c.getContext('2d');let W,H,level=0,started=false,paused=false,keys={};
+const levels=[
+{w:1800,h:900,spawn:[[120,700],[220,700]],exit:[1620,120],pads:[[620,700],[1050,180]],walls:[[0,780,1800,120],[0,0,60,900],[1740,0,60,900],[400,600,60,180],[760,300,60,480],[1150,0,60,500],[1350,500,60,280]],switches:[[480,520],[1250,380]],hint:'Both players must reach the pads.'},
+{w:2000,h:1000,spawn:[[130,820],[250,820]],exit:[1810,120],pads:[[560,780],[1450,250]],walls:[[0,900,2000,100],[0,0,60,1000],[1940,0,60,1000],[350,650,60,250],[700,300,60,600],[1050,650,60,250],[1400,0,60,600],[1650,500,60,400]],switches:[[500,500],[1250,500]],hint:'Switches open the central route.'},
+{w:2100,h:1050,spawn:[[130,900],[260,900]],exit:[1930,100],pads:[[500,850],[1600,850]],walls:[[0,950,2100,100],[0,0,60,1050],[2040,0,60,1050],[350,600,60,350],[750,300,60,650],[1100,600,60,350],[1450,300,60,650],[1800,600,60,350]],switches:[[520,480],[1580,480]],hint:'The pads can unlock the upper gates.'},
+{w:2200,h:1100,spawn:[[140,930],[280,930]],exit:[2030,100],pads:[[520,850],[1650,300]],walls:[[0,1000,2200,100],[0,0,60,1100],[2140,0,60,1100],[380,650,60,350],[760,200,60,800],[1120,650,60,350],[1480,200,60,800],[1840,650,60,350]],switches:[[520,520],[1660,520]],hint:'Split up: one explorer takes the high route.'},
+{w:2400,h:1200,spawn:[[140,1030],[300,1030]],exit:[2230,100],pads:[[500,930],[1880,300]],walls:[[0,1100,2400,100],[0,0,60,1200],[2340,0,60,1200],[360,700,60,400],[700,350,60,750],[1040,700,60,400],[1380,350,60,750],[1720,700,60,400],[2060,350,60,750]],switches:[[500,550],[1900,550]],hint:'Final test: coordinate every move.'}
+];
+let P=[],cam={x:0,y:0};
+function reset(){let l=levels[level];P=[{x:l.spawn[0][0],y:l.spawn[0][1],vx:0,vy:0,r:22,c:'#55b9ff',on:false},{x:l.spawn[1][0],y:l.spawn[1][1],vx:0,vy:0,r:22,c:'#ff996d',on:false}];cam={x:0,y:0};document.getElementById('level').textContent='LEVEL '+(level+1)+' / '+levels.length;show(l.hint)}
+function show(t){let m=document.getElementById('msg');m.textContent=t;m.style.opacity=1;clearTimeout(show.t);show.t=setTimeout(()=>m.style.opacity=0,2200)}
+function rectHit(a,r){return a.x+a.r>r[0]&&a.x-a.r<r[0]+r[2]&&a.y+a.r>r[1]&&a.y-a.r<r[1]+r[3]}
+function move(p,dx,dy,l){p.x+=dx;for(const r of l.walls)if(rectHit(p,r)){if(dx>0)p.x=r[0]-p.r;else if(dx<0)p.x=r[0]+r[2]+p.r}
+p.y+=dy;for(const r of l.walls)if(rectHit(p,r)){if(dy>0)p.y=r[1]-p.r;else if(dy<0)p.y=r[1]+r[3]+p.r}
+p.x=Math.max(60+p.r,Math.min(l.w-60-p.r,p.x));p.y=Math.max(p.r,Math.min(l.h-100-p.r,p.y))}
+function update(){if(!started||paused)return;let l=levels[level],sp=[['a','d','w','s'],['ArrowLeft','ArrowRight','ArrowUp','ArrowDown']];P.forEach((p,i)=>{let k=sp[i],ax=(keys[k[1]]?1:0)-(keys[k[0]]?1:0),ay=(keys[k[3]]?1:0)-(keys[k[2]]?1:0);let len=Math.hypot(ax,ay)||1;move(p,ax/len*4.1,ay/len*4.1,l);p.on=l.pads.some(q=>Math.hypot(p.x-(q[0]),p.y-(q[1]))<55)});let both=P.every(p=>p.on), ex=Math.hypot(P[0].x-l.exit[0],P[0].y-l.exit[1])<65&&Math.hypot(P[1].x-l.exit[0],P[1].y-l.exit[1])<65;
+if(both)show('PAD LINKED — the exit is powered!');if(ex&&both){if(level<levels.length-1){level++;reset();}else{started=false;document.getElementById('menu').style.display='grid';document.querySelector('#menu h1').textContent='YOU MADE IT';document.querySelector('#menu p').textContent='Five rooms. Two explorers. Perfect teamwork.';document.getElementById('start').textContent='PLAY AGAIN';level=0}}
+cam.x+=(Math.max(P[0].x,P[1].x)-W/2-cam.x)*.08;cam.y+=(Math.max(P[0].y,P[1].y)-H/2-cam.y)*.08;cam.x=Math.max(0,Math.min(l.w-W,cam.x));cam.y=Math.max(0,Math.min(l.h-H,cam.y))}
+function draw(){W=c.width=innerWidth;H=c.height=innerHeight;x.clearRect(0,0,W,H);x.save();x.translate(-cam.x,-cam.y);let l=levels[level];
+x.fillStyle='#0d1420';x.fillRect(0,0,l.w,l.h);
+for(let i=0;i<l.w;i+=80){x.strokeStyle='#ffffff08';x.beginPath();x.moveTo(i,0);x.lineTo(i,l.h);x.stroke()}for(let j=0;j<l.h;j+=80){x.strokeStyle='#ffffff08';x.beginPath();x.moveTo(0,j);x.lineTo(l.w,j);x.stroke()}
+l.walls.forEach(r=>{x.fillStyle='#27344a';x.fillRect(...r);x.strokeStyle='#5c769d';x.strokeRect(...r)});
+l.pads.forEach((q,i)=>{x.beginPath();x.arc(q[0],q[1],48,0,7);x.fillStyle=P[i]?.on?'#5ff0a2':'#26384e';x.fill();x.strokeStyle=i?'#ff996d':'#55b9ff';x.lineWidth=5;x.stroke()});
+x.beginPath();x.arc(l.exit[0],l.exit[1],55,0,7);x.fillStyle=P.every(p=>p.on)?'#5ff0a2':'#182333';x.fill();x.strokeStyle='#d9e8ff';x.lineWidth=4;x.stroke();x.fillStyle='#fff';x.font='bold 16px system-ui';x.textAlign='center';x.fillText('EXIT',l.exit[0],l.exit[1]+6);
+l.switches.forEach(q=>{x.fillStyle='#d8c76b';x.fillRect(q[0]-18,q[1]-18,36,36)});
+P.forEach((p,i)=>{x.shadowBlur=18;x.shadowColor=p.c;x.fillStyle=p.c;x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fill();x.shadowBlur=0;x.fillStyle='#07101b';x.font='bold 13px system-ui';x.textAlign='center';x.fillText(i?'2':'1',p.x,p.y+5)});
+x.restore();if(paused){x.fillStyle='#0009';x.fillRect(0,0,W,H);x.fillStyle='#fff';x.font='bold 42px system-ui';x.textAlign='center';x.fillText('PAUSED',W/2,H/2)}requestAnimationFrame(loop)}
+function loop(){update();draw()}addEventListener('keydown',e=>{keys[e.key]=true;if(e.key.toLowerCase()==='r'&&started)reset();if(e.key==='Escape'&&started)paused=!paused});addEventListener('keyup',e=>keys[e.key]=false);
+document.getElementById('start').onclick=()=>{document.getElementById('menu').style.display='none';started=true;paused=false;reset()};addEventListener('resize',draw);reset();loop();
+</script></body></html>
